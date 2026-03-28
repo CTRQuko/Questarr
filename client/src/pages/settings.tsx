@@ -18,6 +18,8 @@ import {
   ShieldAlert,
   Upload,
   Gamepad2,
+  Ban,
+  Trash2,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -40,7 +42,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, clearSearchCache } from "@/lib/queryClient";
 import AutoDownloadRulesSettings from "@/components/AutoDownloadRulesSettings";
 import PasswordSettings from "@/components/PasswordSettings";
-import type { Config, UserSettings, DownloadRules } from "@shared/schema";
+import type { Config, UserSettings, DownloadRules, ReleaseBlacklist } from "@shared/schema";
 import { downloadRulesSchema } from "@shared/schema";
 import { useState, useEffect, useRef } from "react";
 
@@ -84,6 +86,25 @@ export default function SettingsPage() {
 
   const { data: user } = useQuery<{ id: string; username: string; steamId64?: string }>({
     queryKey: ["/api/auth/me"],
+  });
+
+  const { data: blacklistEntries, isLoading: blacklistLoading } = useQuery<
+    (ReleaseBlacklist & { gameTitle: string })[]
+  >({
+    queryKey: ["/api/blacklist"],
+  });
+
+  const removeBlacklistMutation = useMutation({
+    mutationFn: async ({ gameId, id }: { gameId: string; id: string }) => {
+      await apiRequest("DELETE", `/api/games/${gameId}/blacklist/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/blacklist"] });
+      toast({ description: "Release removed from blacklist" });
+    },
+    onError: () => {
+      toast({ variant: "destructive", description: "Failed to remove from blacklist" });
+    },
   });
 
   // Local state for form
@@ -519,6 +540,7 @@ export default function SettingsPage() {
             <TabsTrigger value="account">Account</TabsTrigger>
             <TabsTrigger value="security">Security</TabsTrigger>
             <TabsTrigger value="system">System</TabsTrigger>
+            <TabsTrigger value="blacklist">Blacklist</TabsTrigger>
           </TabsList>
 
           <TabsContent value="general" className="space-y-6">
@@ -1368,6 +1390,75 @@ export default function SettingsPage() {
                       </Button>
                     </div>
                   </>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="blacklist" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Ban className="h-5 w-5" />
+                  Blacklisted Releases
+                </CardTitle>
+                <CardDescription>
+                  Releases hidden from search results. They will not appear in game download
+                  searches or be auto-downloaded.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {blacklistLoading ? (
+                  <div className="text-sm text-muted-foreground">Loading...</div>
+                ) : !blacklistEntries || blacklistEntries.length === 0 ? (
+                  <div className="text-sm text-muted-foreground">No blacklisted releases.</div>
+                ) : (
+                  <div className="space-y-4">
+                    {Object.entries(
+                      blacklistEntries.reduce<
+                        Record<string, (ReleaseBlacklist & { gameTitle: string })[]>
+                      >((acc, entry) => {
+                        (acc[entry.gameTitle] ??= []).push(entry);
+                        return acc;
+                      }, {})
+                    ).map(([gameTitle, entries]) => (
+                      <div key={gameTitle}>
+                        <h4 className="text-sm font-semibold mb-2">{gameTitle}</h4>
+                        <div className="space-y-2">
+                          {entries.map((entry) => (
+                            <div
+                              key={entry.id}
+                              className="flex items-center justify-between rounded-md border p-3"
+                            >
+                              <div className="space-y-1">
+                                <p className="text-sm font-medium leading-none">
+                                  {entry.releaseTitle}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {entry.indexerName ? `${entry.indexerName} · ` : ""}
+                                  {entry.createdAt
+                                    ? new Date(entry.createdAt).toLocaleDateString()
+                                    : ""}
+                                </p>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() =>
+                                  removeBlacklistMutation.mutate({
+                                    gameId: entry.gameId,
+                                    id: entry.id,
+                                  })
+                                }
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </CardContent>
             </Card>

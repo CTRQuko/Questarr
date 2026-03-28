@@ -38,6 +38,7 @@ vi.mock("../storage.js", () => ({
     updateGameSearchResultsAvailable: mockUpdateGameSearchResultsAvailable,
     // Other methods that might be called (though ideally we isolate the test enough)
     getEnabledDownloaders: vi.fn().mockResolvedValue([]),
+    getReleaseBlacklistSet: vi.fn().mockResolvedValue(new Set()),
   },
 }));
 

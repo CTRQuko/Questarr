@@ -51,6 +51,7 @@ vi.mock("lucide-react", () => ({
   ChevronsUpDown: () => <div data-testid="icon-chevrons-up-down" />,
   MoreVertical: () => <div />,
   Copy: () => <div />,
+  Ban: () => <div data-testid="icon-ban" />,
 }));
 
 const mockGame = {
