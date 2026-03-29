@@ -360,6 +360,9 @@ export interface Config {
   xrel?: {
     apiBase: string;
   };
+  discord?: {
+    webhookConfigured: boolean;
+  };
 }
 
 // Download-related types shared between frontend and backend
