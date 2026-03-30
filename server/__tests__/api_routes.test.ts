@@ -1524,6 +1524,9 @@ describe("API Routes - Extended Coverage", () => {
         expect(response.status).toBe(200);
         expect(response.body).toEqual([]);
       });
+    });
+  });
+
   // ─── Discord Settings ───
   describe("Discord settings", () => {
     describe("GET /api/settings/discord", () => {
