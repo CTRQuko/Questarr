@@ -10,6 +10,24 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 // Mocking external dependencies
+vi.mock("@/components/ui/dropdown-menu", () => ({
+  DropdownMenu: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DropdownMenuContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DropdownMenuItem: ({
+    children,
+    onClick,
+  }: {
+    children: React.ReactNode;
+    onClick?: () => void;
+  }) => <button onClick={onClick}>{children}</button>,
+  DropdownMenuSub: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DropdownMenuSubContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DropdownMenuSubTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DropdownMenuPortal: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DropdownMenuSeparator: () => <hr />,
+}));
+
 vi.mock("@/hooks/use-toast", () => ({
   useToast: () => ({
     toast: vi.fn(),
@@ -49,7 +67,7 @@ vi.mock("lucide-react", () => ({
   ChevronDown: () => <div data-testid="icon-chevron-down" />,
   ChevronUp: () => <div data-testid="icon-chevron-up" />,
   ChevronsUpDown: () => <div data-testid="icon-chevrons-up-down" />,
-  MoreVertical: () => <div />,
+  MoreVertical: () => <div data-testid="icon-more-vertical" />,
   Copy: () => <div />,
   Ban: () => <div data-testid="icon-ban" />,
 }));
@@ -185,6 +203,17 @@ describe("GameDownloadDialog", () => {
         });
       }
 
+      if (urlString.includes("/blacklist")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            id: "bl-1",
+            gameId: mockGame.id,
+            releaseTitle: "Test Torrent 1",
+          }),
+        });
+      }
+
       return Promise.resolve({ ok: false, json: async () => ({}) });
     }) as never;
   });
@@ -258,6 +287,30 @@ describe("GameDownloadDialog", () => {
 
     // Should trigger a re-sort -> Ascending -> ArrowUp
     expect(screen.getAllByTestId("icon-sort-up").length).toBeGreaterThan(0);
+  });
+
+  it("blacklists a release when clicking 'Blacklist release'", async () => {
+    renderComponent();
+
+    // Wait for results to load (dropdown is always rendered via mock)
+    await waitFor(
+      () => {
+        expect(screen.getAllByText("Blacklist release").length).toBeGreaterThan(0);
+      },
+      { timeout: 3000 }
+    );
+
+    fireEvent.click(screen.getAllByText("Blacklist release")[0]);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/blacklist"),
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining("Test Torrent 1"),
+        })
+      );
+    });
   });
 
   it("shows a loading spinner on the download button when clicked", async () => {
