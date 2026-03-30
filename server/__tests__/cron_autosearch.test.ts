@@ -27,6 +27,7 @@ const mockGetUserSettings = vi.fn();
 const mockUpdateUserSettings = vi.fn();
 const mockAddNotification = vi.fn();
 const mockUpdateGameSearchResultsAvailable = vi.fn();
+const mockGetReleaseBlacklistSet = vi.fn();
 
 vi.mock("../storage.js", () => ({
   storage: {
@@ -38,7 +39,7 @@ vi.mock("../storage.js", () => ({
     updateGameSearchResultsAvailable: mockUpdateGameSearchResultsAvailable,
     // Other methods that might be called (though ideally we isolate the test enough)
     getEnabledDownloaders: vi.fn().mockResolvedValue([]),
-    getReleaseBlacklistSet: vi.fn().mockResolvedValue(new Set()),
+    getReleaseBlacklistSet: mockGetReleaseBlacklistSet,
   },
 }));
 
@@ -138,6 +139,7 @@ describe("Cron - checkAutoSearch", () => {
     mockGetUserGames.mockResolvedValue([]);
     mockGetUserSettings.mockResolvedValue(baseSettings);
     mockSearchAllIndexers.mockResolvedValue({ items: [], errors: [], total: 0 });
+    mockGetReleaseBlacklistSet.mockResolvedValue(new Set());
   });
 
   afterEach(() => {
@@ -422,5 +424,29 @@ describe("Cron - checkAutoSearch", () => {
     await checkAutoSearch();
 
     expect(mockUpdateGameSearchResultsAvailable).toHaveBeenCalledWith(game.id, true);
+  });
+
+  it("should not notify when all matched items are blacklisted", async () => {
+    const game = { ...baseGame, status: "wanted" as const, releaseStatus: "released" as const };
+    mockGetWantedGamesGroupedByUser.mockResolvedValue(new Map([[userId, [game]]]));
+    mockSearchAllIndexers.mockResolvedValue({
+      items: [
+        {
+          title: "Test Game-SKIDROW",
+          link: "https://example.com/download",
+          pubDate: FIXED_PUB_DATE,
+          seeders: 50,
+          size: 10_000,
+        },
+      ],
+      errors: [],
+      total: 1,
+    });
+    mockGetReleaseBlacklistSet.mockResolvedValue(new Set(["Test Game-SKIDROW"]));
+
+    await checkAutoSearch();
+
+    expect(mockAddNotification).not.toHaveBeenCalled();
+    expect(mockUpdateGameSearchResultsAvailable).not.toHaveBeenCalled();
   });
 });
